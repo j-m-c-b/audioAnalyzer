@@ -148,7 +148,7 @@
 
             domInRangeOffset.value = offset;
 
-            document.getElementById("domInRangeOffsetShowValue").innerHTML = 8;
+            document.getElementById("domInRangeOffsetShowValue").innerText = 8;
 
             offsetConvert = h / offset;
             newAudio.controls = true;
@@ -196,6 +196,7 @@
         domInRangeOffset.addEventListener("click", function () {
             offset = domInRangeOffset.value;
             offsetConvert = h / offset;
+            document.getElementById("domInRangeOffsetShowValue").innerText = offset;
         });
 
 
