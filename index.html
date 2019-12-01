@@ -1,0 +1,268 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Audio Analyzer</title>
+    <link rel="icon" type="image/png" href="icon/icon.png">
+    <style>
+        body {
+            background-color: black;
+            color: white;
+        }
+
+        canvas {
+            width: 100%;
+        }
+
+
+        .center {
+            text-align: center;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div>
+        <h1 class="center">Audio Analyzer</h1>
+    </div>
+
+    <h2>Select Audio File:</h2>
+    <input type="file" accept=".m4a, .mp3, .mp4, .wav" name="" id="domIn">
+    <hr>
+    <div>
+
+
+        <h2>Control Audio:</h2>
+        <div id="audioContainer"></div>
+
+
+        <hr>
+        <div class="center">
+            <button id="domInBtnFullScreen">FullScreen</button>
+        </div>
+
+        <br>
+        <h2>Player:</h2>
+        <canvas id="canvasPlayer"></canvas>
+    </div>
+    <hr>
+    <div id="controls">
+        <h2>Options</h2>
+        <div>
+            Change the number of bars: <br>
+            <input id="domInBars" type="range" value="150" min="0" max="300" step="2">
+            <span id="domInBarsShowValue">
+            </span>
+        </div>
+        <br>
+        <div>
+            Change the colors <br>
+            Color 4:
+            <input id="domInColor4" type="color" name=""> <br>
+            Color 3:
+            <input id="domInColor3" type="color" name=""> <br>
+            Color 2:
+            <input id="domInColor2" type="color" name=""> <br>
+            Color 1:
+            <input id="domInColor1" type="color" name=""> <br>
+        </div>
+        <br>
+        <div>
+            Change Y Coordinate Offset: <br>
+            <input id="domInRangeOffset" type="range" value="0" min="0" max="12">
+            <span id="domInRangeOffsetShowValue">
+            </span>
+        </div>
+
+    </div>
+
+    <script>
+        let canvas;
+        let ctx;
+        let source;
+        let context;
+        let analyser;
+        let fbc_array;
+        let bars;
+        let bar_x;
+        let bar_width;
+        let bar_height;
+        let colorList;
+
+        let domIn = document.getElementById("domIn");
+
+        let domInBars = document.getElementById("domInBars");
+
+        let domInColor1 = document.getElementById("domInColor1");
+        let domInColor2 = document.getElementById("domInColor2");
+        let domInColor3 = document.getElementById("domInColor3");
+        let domInColor4 = document.getElementById("domInColor4");
+
+        let domInRangeOffset;
+
+        let newAudio;
+        let w;
+        let h;
+
+        let fL;
+        let offset;
+        let offsetConvert;
+        let limit;
+
+
+
+        let domInBtnFullScreen;
+
+
+        function setValues() {
+            w = 500;
+            h = 200;
+
+            canvas = document.getElementById('canvasPlayer');
+            ctx = canvas.getContext('2d');
+            canvas.width = w
+            canvas.height = h;
+            newAudio = new Audio();
+
+            bars = 150;
+            bar_width = 2;
+            colorList = ["#7ac118", "#fbfb62", "#fbe097", "#ff6666"]
+            document.getElementById("domInBarsShowValue").innerText = bars;
+            domInColor1.value = colorList[0];
+            domInColor2.value = colorList[1];
+            domInColor3.value = colorList[2];
+            domInColor4.value = colorList[3];
+            domInBars.value = bars;
+
+            fL = [0.30, 0.45, 0.68];
+
+            offset = 8;
+
+            limit = 269;
+
+            domInRangeOffset = document.getElementById("domInRangeOffset");
+
+            domInRangeOffset.value = offset;
+
+            document.getElementById("domInRangeOffsetShowValue").innerHTML = 8;
+
+            offsetConvert = h / offset;
+            newAudio.controls = true;
+            document.getElementById('audioContainer').appendChild(newAudio);
+
+            domInBtnFullScreen = document.getElementById("domInBtnFullScreen");
+        }
+        setValues();
+
+
+
+
+
+
+        domIn.addEventListener("change", function (e) {
+
+            newAudio.src = URL.createObjectURL(this.files[0]);
+            if (!source) {
+                startPlayer();
+            }
+
+        });
+
+        domInBars.addEventListener("change", function () {
+            bars = domInBars.value;
+            document.getElementById("domInBarsShowValue").innerText = bars;
+        });
+        domInColor1.addEventListener("change", function () {
+            colorList[0] = domInColor1.value;
+        });
+        domInColor2.addEventListener("change", function () {
+            colorList[1] = domInColor2.value;
+        });
+        domInColor3.addEventListener("change", function () {
+            colorList[2] = domInColor3.value;
+        });
+        domInColor4.addEventListener("change", function () {
+            colorList[3] = domInColor4.value;
+        });
+
+        domInBtnFullScreen.addEventListener("click", function () {
+            canvas.requestFullscreen();
+        });
+
+        domInRangeOffset.addEventListener("click", function () {
+            offset = domInRangeOffset.value;
+            offsetConvert = h / offset;
+        });
+
+
+        function map(num, in_min, in_max, out_min, out_max) {
+            return (num - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+        }
+
+        function startPlayer() {
+
+
+            context = new AudioContext();
+            analyser = context.createAnalyser();
+
+            source = context.createMediaElementSource(newAudio);
+            source.connect(analyser);
+            analyser.connect(context.destination);
+
+
+
+            draw();
+        }
+
+
+
+
+
+        function draw() {
+            window.requestAnimationFrame(draw);
+            fbc_array = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(fbc_array);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            bar_width = (w + 1) / bars;
+            for (var i = 0; i < bars; i++) {
+                bar_x = i * (bar_width + 1);
+
+
+                bar_height = - map(fbc_array[i], 0, limit, 0, h);
+                if ((-bar_height > 0)) {
+                    ctx.fillStyle = colorList[0];
+                    ctx.fillRect(bar_x, canvas.height + offsetConvert, bar_width, bar_height);
+
+                } if (-bar_height >= h * fL[0]) {
+                    ctx.fillStyle = colorList[1];
+                    ctx.fillRect(bar_x, canvas.height - (h * fL[0]) + offsetConvert, bar_width, bar_height + (h * fL[0]));
+
+                }
+                if (-bar_height >= h * fL[1]) {
+                    ctx.fillStyle = colorList[2];
+                    ctx.fillRect(bar_x, canvas.height - (h * fL[1]) + offsetConvert, bar_width, bar_height + (h * fL[1]));
+
+
+                }
+                if (-bar_height >= h * fL[2]) {
+                    ctx.fillStyle = colorList[3];
+                    ctx.fillRect(bar_x, canvas.height - (h * fL[2]) + offsetConvert, bar_width, bar_height + (h * fL[2]));
+                }
+
+
+
+
+            }
+
+
+        }
+    </script>
+</body>
+
+
+</html>
